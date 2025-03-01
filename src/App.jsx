@@ -1,29 +1,31 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
-import SearchBar from "./components/SearchBar"
-import CurrentWeather from "./components/CurrentWeather"
-import HourlyForecast from "./components/HourlyForecast"
-import WeeklyForecast from "./components/WeeklyForecast"
-import ThemeToggle from "./components/ThemeToggle"
-import LoadingSpinner from "./components/LoadingSpinner"
-import ErrorMessage from "./components/ErrorMessage"
+import { motion, AnimatePresence } from "framer-motion"
+import Header from "./components/Header"
+import Footer from "./components/Footer"
+import WeatherDisplay from "./components/weather-display"
+import SearchBar from "./components/search-bar"
+import HourlyForecast from "./components/hourly-forecast"
+import WeeklyForecast from "./components/weekly-forecast"
+import WeatherStats from "./components/WeatherStats"
+import LoadingSpinner from "./components/loading-spinner"
+import ErrorMessage from "./components/error-message"
+import AnimatedBackground from "./components/AnimatedBackground"
 import { fetchWeatherData, fetchForecastData } from "./services/weatherService"
+import { getWeatherPattern } from "./services/backgroundService"
 
-function App() {
+export default function App() {
   const [weatherData, setWeatherData] = useState(null)
   const [forecastData, setForecastData] = useState(null)
   const [location, setLocation] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [darkMode, setDarkMode] = useState(() => {
-    // Get saved theme from localStorage or use system preference
     const savedTheme = localStorage.getItem("theme")
     return savedTheme ? savedTheme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches
   })
 
-  // Apply dark mode class to html element
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add("dark")
@@ -33,7 +35,6 @@ function App() {
     localStorage.setItem("theme", darkMode ? "dark" : "light")
   }, [darkMode])
 
-  // Get user's location on initial load
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -42,11 +43,10 @@ function App() {
             const { latitude, longitude } = position.coords
             const weatherResponse = await fetchWeatherData({ lat: latitude, lon: longitude })
             setWeatherData(weatherResponse)
-            setLocation(weatherResponse.name)
+            setLocation({ lat: latitude, lon: longitude, name: weatherResponse.name })
 
             const forecastResponse = await fetchForecastData({ lat: latitude, lon: longitude })
             setForecastData(forecastResponse)
-
             setLoading(false)
           } catch (err) {
             setError("Failed to fetch weather data. Please try again.")
@@ -64,7 +64,6 @@ function App() {
     }
   }, [])
 
-  // Handle location search
   const handleLocationSelect = async (selectedLocation) => {
     try {
       setLoading(true)
@@ -87,46 +86,54 @@ function App() {
     }
   }
 
-  // Toggle dark mode
   const toggleDarkMode = () => {
     setDarkMode(!darkMode)
   }
 
+  const weatherPattern = weatherData ? getWeatherPattern(weatherData.weather[0].id) : "clear"
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 dark:from-gray-900 dark:to-gray-800 transition-colors duration-500">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex justify-between items-center mb-8"
-        >
-          <h1 className="text-3xl font-bold text-blue-600 dark:text-blue-400">Weather App</h1>
-          <ThemeToggle darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
-        </motion.div>
+    <div className={`min-h-screen relative ${darkMode ? "dark" : ""}`}>
+      <AnimatedBackground weatherType={weatherPattern} />
 
-        <SearchBar onLocationSelect={handleLocationSelect} />
+      <div className="relative z-10">
+        <Header darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
 
-        {loading ? (
-          <LoadingSpinner />
-        ) : error ? (
-          <ErrorMessage message={error} />
-        ) : (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.2 }}>
-            {weatherData && <CurrentWeather weatherData={weatherData} />}
+        <main className="container mx-auto px-4 py-8">
+          <SearchBar
+            searchQuery={location?.name || ""}
+            handleSearchChange={(e) => setLocation({ ...location, name: e.target.value })}
+            searchResults={[]}
+            handleLocationSelect={handleLocationSelect}
+          />
 
-            {forecastData && (
-              <>
-                <HourlyForecast forecastData={forecastData} />
-                <WeeklyForecast forecastData={forecastData} />
-              </>
-            )}
-          </motion.div>
-        )}
+          {loading ? (
+            <LoadingSpinner />
+          ) : error ? (
+            <ErrorMessage message={error} />
+          ) : (
+            <AnimatePresence>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+                {weatherData && (
+                  <>
+                    <WeatherDisplay weather={weatherData} location={location} />
+                    <WeatherStats weatherData={weatherData} />
+                    {forecastData && (
+                      <>
+                        <HourlyForecast hourlyData={forecastData.list.slice(0, 8)} />
+                        <WeeklyForecast forecast={forecastData} />
+                      </>
+                    )}
+                  </>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          )}
+        </main>
+
+        <Footer />
       </div>
     </div>
   )
 }
-
-export default App
 
