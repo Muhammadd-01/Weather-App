@@ -1,5 +1,5 @@
 // API key for OpenWeather API
-const API_KEY = "YOUR_OPENWEATHER_API_KEY"
+const API_KEY = "84011d9586dfbb5c34013f640d2f1fe6"
 const BASE_URL = "https://api.openweathermap.org/data/2.5"
 
 // Fetch current weather data
